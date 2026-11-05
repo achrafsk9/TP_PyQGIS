@@ -30,7 +30,8 @@ from qgis.PyQt.QtWidgets import QAction
 from .mon_extension_dialog import MonExtensionDialog
 import os.path
 
-from qgis.core import QgsProject, QgsVectorLayer, QgsWkbTypes
+from qgis.core import QgsProject, QgsVectorLayer, QgsWkbTypes, QgsCoordinateReferenceSystem, QgsCoordinateTransform
+from qgis.gui import QgsMapToolEmitPoint
 
 class MonExtension:
     """QGIS Plugin Implementation."""
@@ -185,21 +186,23 @@ class MonExtension:
             if isinstance(couche, QgsVectorLayer) and couche.geometryType() == QgsWkbTypes.PointGeometry:
                 self.dlg.comboCouches.addItem(couche.name(), couche.id())
     
+    def displayPoint(self, point, button):
+        crsCarte = self.canvas.mapSettings().destinationCrs()
+        crsWgs84 = QgsCoordinateReferenceSystem("EPSG:4326")
+        transformation = QgsCoordinateTransform(crsCarte, crsWgs84, QgsProject.instance())
+        pointWgs84 = transformation.transform(point)
+        self.dlg.labelLongitude.setText(f"Longitude : {pointWgs84.x():.5f}")
+        self.dlg.labelLatitude.setText(f"Latitude : {pointWgs84.y():.5f}")
+
     def run(self):
         """Run method that performs all the real work"""
-
-        # Create the dialog with elements (after translation) and keep reference
-        # Only create GUI ONCE in callback, so that it will only load when the plugin is started
         if self.first_start == True:
             self.first_start = False
-            self.dlg = MonExtensionDialog()
+            self.dlg = MonExtensionDialog(self.iface.mainWindow())
+            self.canvas = self.iface.mapCanvas()
+            self.pointTool = QgsMapToolEmitPoint(self.canvas)
+            self.pointTool.canvasClicked.connect(self.displayPoint)
+
         self.remplirListeCouches()
-        # show the dialog
+        self.canvas.setMapTool(self.pointTool)
         self.dlg.show()
-        # Run the dialog event loop
-        result = self.dlg.exec_()
-        # See if OK was pressed
-        if result:
-            # Do something useful here - delete the line containing pass and
-            # substitute with your code.
-            pass
