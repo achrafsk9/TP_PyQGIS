@@ -30,6 +30,7 @@ from qgis.PyQt.QtWidgets import QAction
 from .mon_extension_dialog import MonExtensionDialog
 import os.path
 
+from qgis.core import QgsProject, QgsVectorLayer, QgsWkbTypes
 
 class MonExtension:
     """QGIS Plugin Implementation."""
@@ -178,7 +179,12 @@ class MonExtension:
                 action)
             self.iface.removeToolBarIcon(action)
 
-
+    def remplirListeCouches(self):
+        self.dlg.comboCouches.clear()
+        for couche in QgsProject.instance().mapLayers().values():
+            if isinstance(couche, QgsVectorLayer) and couche.geometryType() == QgsWkbTypes.PointGeometry:
+                self.dlg.comboCouches.addItem(couche.name(), couche.id())
+    
     def run(self):
         """Run method that performs all the real work"""
 
@@ -187,7 +193,7 @@ class MonExtension:
         if self.first_start == True:
             self.first_start = False
             self.dlg = MonExtensionDialog()
-
+        self.remplirListeCouches()
         # show the dialog
         self.dlg.show()
         # Run the dialog event loop
