@@ -30,7 +30,7 @@ from qgis.PyQt.QtWidgets import QAction
 from .mon_extension_dialog import MonExtensionDialog
 import os.path
 import requests
-from qgis.core import QgsProject, QgsVectorLayer, QgsWkbTypes, QgsCoordinateReferenceSystem, QgsCoordinateTransform
+from qgis.core import Qgis, QgsProject, QgsVectorLayer, QgsWkbTypes, QgsCoordinateReferenceSystem, QgsCoordinateTransform, QgsGeometry, QgsFeatureRequest
 from qgis.gui import QgsMapToolEmitPoint
 
 class MonExtension:
@@ -194,6 +194,7 @@ class MonExtension:
         self.dlg.labelLongitude.setText(f"Longitude : {pointWgs84.x():.5f}")
         self.dlg.labelLatitude.setText(f"Latitude : {pointWgs84.y():.5f}")
         self.afficherAdresse(pointWgs84)
+        self.compterObjets(pointWgs84)
     
     def afficherAdresse(self, pointWgs84):
         url = "https://data.geopf.fr/geocodage/reverse"
@@ -219,6 +220,50 @@ class MonExtension:
         self.dlg.labelAdresse.setText(
             f"Adresse : {adresse.get('housenumber', '')} {adresse.get('street', '')}, "
             f"{adresse.get('citycode', '')} {adresse.get('city', '')}"
+        )
+    
+    def compterObjets(self, pointWgs84):
+        self.dlg.labelNombreObjets.setText("Nombre d'objets :")
+
+        try:
+            distance = int(self.dlg.lineEditDistance.text())
+        except ValueError:
+            self.iface.messageBar().pushMessage(
+                "Mon Extension", "La distance doit être un nombre entier.",
+                level=Qgis.Critical, duration=5
+            )
+            return
+
+        couche = QgsProject.instance().mapLayer(self.dlg.comboCouches.currentData())
+        if couche is None:
+            self.iface.messageBar().pushMessage(
+                "Mon Extension", "Aucune couche de points sélectionnée.",
+                level=Qgis.Warning, duration=5
+            )
+            return
+
+        projet = QgsProject.instance()
+        crsWgs84 = QgsCoordinateReferenceSystem("EPSG:4326")
+        crsLambert93 = QgsCoordinateReferenceSystem("EPSG:2154")
+
+        # Calcul du tampon en Lambert 93, dont l'unité est le mètre
+        versLambert93 = QgsCoordinateTransform(crsWgs84, crsLambert93, projet)
+        pointLambert93 = versLambert93.transform(pointWgs84)
+        zoneTampon = QgsGeometry.fromPointXY(pointLambert93).buffer(distance, 25)
+
+        # Passage de la zone tampon dans le système de la couche
+        versCouche = QgsCoordinateTransform(crsLambert93, couche.crs(), projet)
+        zoneTampon.transform(versCouche)
+
+        # Présélection par emprise, puis test précis
+        requete = QgsFeatureRequest().setFilterRect(zoneTampon.boundingBox())
+        nombre = 0
+        for objet in couche.getFeatures(requete):
+            if objet.geometry().intersects(zoneTampon):
+                nombre += 1
+
+        self.dlg.labelNombreObjets.setText(
+            f"Il y a {nombre} objet(s) à moins de {distance} mètres du point cliqué"
         )
 
     def run(self):
