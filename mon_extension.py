@@ -30,7 +30,7 @@ from qgis.PyQt.QtWidgets import QAction
 from .mon_extension_dialog import MonExtensionDialog
 import os.path
 import requests
-from qgis.core import Qgis, QgsProject, QgsVectorLayer, QgsWkbTypes, QgsCoordinateReferenceSystem, QgsCoordinateTransform, QgsGeometry, QgsFeatureRequest
+from qgis.core import Qgis, QgsProject, QgsVectorLayer, QgsWkbTypes, QgsCoordinateReferenceSystem, QgsCoordinateTransform, QgsGeometry, QgsFeatureRequest, QgsFeature, QgsFillSymbol
 from qgis.gui import QgsMapToolEmitPoint
 
 class MonExtension:
@@ -67,6 +67,7 @@ class MonExtension:
         # Check if plugin was started the first time in current QGIS session
         # Must be set in initGui() to survive plugin reloads
         self.first_start = None
+        self.idCoucheTampon = None
 
     # noinspection PyMethodMayBeStatic
     def tr(self, message):
@@ -265,6 +266,33 @@ class MonExtension:
         self.dlg.labelNombreObjets.setText(
             f"Il y a {nombre} objet(s) à moins de {distance} mètres du point cliqué"
         )
+        zoneTampon = QgsGeometry.fromPointXY(pointLambert93).buffer(distance, 25)
+        self.afficherZoneTampon(zoneTampon)
+
+    def afficherZoneTampon(self, zoneTampon):
+        projet = QgsProject.instance()
+        couche = projet.mapLayer(self.idCoucheTampon) if self.idCoucheTampon else None
+
+        if couche is None:
+            couche = QgsVectorLayer("Polygon?crs=EPSG:2154", "Zone tampon", "memory")
+            symbole = QgsFillSymbol.createSimple({
+                "style": "no",
+                "outline_color": "#000000",
+                "outline_width": "0.26"
+            })
+            couche.renderer().setSymbol(symbole)
+            projet.addMapLayer(couche)
+            self.idCoucheTampon = couche.id()
+
+        fournisseur = couche.dataProvider()
+        fournisseur.truncate()
+
+        objet = QgsFeature()
+        objet.setGeometry(zoneTampon)
+        fournisseur.addFeatures([objet])
+
+        couche.updateExtents()
+        couche.triggerRepaint()
 
     def run(self):
         """Run method that performs all the real work"""
