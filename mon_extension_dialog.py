@@ -26,7 +26,7 @@ import os
 
 from qgis.PyQt import uic
 from qgis.PyQt import QtWidgets
-
+from qgis.PyQt.QtCore import pyqtSignal
 # This loads your .ui file so that PyQt can populate your plugin with the elements from Qt Designer
 FORM_CLASS, _ = uic.loadUiType(
     os.path.join(
@@ -37,12 +37,24 @@ FORM_CLASS, _ = uic.loadUiType(
 
 
 class MonExtensionDialog(QtWidgets.QDialog, FORM_CLASS):
+    fermeture = pyqtSignal()
+    annulation = pyqtSignal()
+
     def __init__(self, parent=None):
-        """Constructor."""
         super(MonExtensionDialog, self).__init__(parent)
-        # Set up the user interface from Designer through FORM_CLASS.
-        # After self.setupUi() you can access any designer object by doing
-        # self.<objectname>, and you can use autoconnect slots - see
-        # http://qt-project.org/doc/qt-4.8/designer-using-a-ui-file.html
-        # #widgets-and-dialogs-with-auto-connect
         self.setupUi(self)
+
+        boutonAnnuler = self.buttonBox.button(QtWidgets.QDialogButtonBox.Cancel)
+        boutonAnnuler.setAutoDefault(False)
+        boutonAnnuler.setDefault(False)
+
+        self.buttonBox.rejected.disconnect()
+        self.buttonBox.rejected.connect(self.annuler)
+
+    def reject(self):
+        self.fermeture.emit()
+        super(MonExtensionDialog, self).reject()
+
+    def annuler(self):
+        self.annulation.emit()
+        super(MonExtensionDialog, self).reject()
