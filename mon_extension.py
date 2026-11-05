@@ -29,7 +29,7 @@ from qgis.PyQt.QtWidgets import QAction
 # Import the code for the dialog
 from .mon_extension_dialog import MonExtensionDialog
 import os.path
-
+import requests
 from qgis.core import QgsProject, QgsVectorLayer, QgsWkbTypes, QgsCoordinateReferenceSystem, QgsCoordinateTransform
 from qgis.gui import QgsMapToolEmitPoint
 
@@ -193,6 +193,33 @@ class MonExtension:
         pointWgs84 = transformation.transform(point)
         self.dlg.labelLongitude.setText(f"Longitude : {pointWgs84.x():.5f}")
         self.dlg.labelLatitude.setText(f"Latitude : {pointWgs84.y():.5f}")
+        self.afficherAdresse(pointWgs84)
+    
+    def afficherAdresse(self, pointWgs84):
+        url = "https://data.geopf.fr/geocodage/reverse"
+        parametres = {
+            "lon": pointWgs84.x(),
+            "lat": pointWgs84.y(),
+            "type": "housenumber",
+            "limit": 1
+        }
+        try:
+            reponse = requests.get(url, params=parametres, timeout=5)
+            reponse.raise_for_status()
+            resultats = reponse.json()["features"]
+        except (requests.RequestException, ValueError, KeyError):
+            self.dlg.labelAdresse.setText("Adresse : service indisponible")
+            return
+
+        if not resultats:
+            self.dlg.labelAdresse.setText("Adresse : aucune adresse trouvée")
+            return
+
+        adresse = resultats[0]["properties"]
+        self.dlg.labelAdresse.setText(
+            f"Adresse : {adresse.get('housenumber', '')} {adresse.get('street', '')}, "
+            f"{adresse.get('citycode', '')} {adresse.get('city', '')}"
+        )
 
     def run(self):
         """Run method that performs all the real work"""
