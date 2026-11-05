@@ -25,7 +25,7 @@ from qgis.PyQt.QtCore import QLocale, QTranslator, QCoreApplication
 from qgis.core import QgsSettings
 from qgis.PyQt.QtGui import QIcon
 from qgis.PyQt.QtWidgets import QAction
-
+from qgis.PyQt.QtCore import pyqtSignal
 # Import the code for the dialog
 from .mon_extension_dialog import MonExtensionDialog
 import os.path
@@ -293,6 +293,23 @@ class MonExtension:
 
         couche.updateExtents()
         couche.triggerRepaint()
+    
+    def restaurerOutil(self):
+        if self.outilPrecedent is not None:
+            self.canvas.setMapTool(self.outilPrecedent)
+        else:
+            self.canvas.unsetMapTool(self.pointTool)
+
+    def fermerExtension(self):
+        self.restaurerOutil()
+
+    def annulerExtension(self):
+        projet = QgsProject.instance()
+        if self.idCoucheTampon and projet.mapLayer(self.idCoucheTampon):
+            projet.removeMapLayer(self.idCoucheTampon)
+        self.idCoucheTampon = None
+        self.restaurerOutil()
+        self.canvas.refresh()
 
     def run(self):
         """Run method that performs all the real work"""
@@ -301,8 +318,16 @@ class MonExtension:
             self.dlg = MonExtensionDialog(self.iface.mainWindow())
             self.canvas = self.iface.mapCanvas()
             self.pointTool = QgsMapToolEmitPoint(self.canvas)
+            self.outilPrecedent = None
             self.pointTool.canvasClicked.connect(self.displayPoint)
+            self.dlg.fermeture.connect(self.fermerExtension)
+            self.dlg.annulation.connect(self.annulerExtension)
 
         self.remplirListeCouches()
+
+        outilActif = self.canvas.mapTool()
+        if outilActif is not self.pointTool:
+            self.outilPrecedent = outilActif
+
         self.canvas.setMapTool(self.pointTool)
         self.dlg.show()
