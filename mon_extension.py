@@ -25,7 +25,6 @@ from qgis.PyQt.QtCore import QLocale, QTranslator, QCoreApplication
 from qgis.core import QgsSettings
 from qgis.PyQt.QtGui import QIcon
 from qgis.PyQt.QtWidgets import QAction
-from qgis.PyQt.QtCore import pyqtSignal
 # Import the code for the dialog
 from .mon_extension_dialog import MonExtensionDialog
 import os.path
@@ -224,7 +223,7 @@ class MonExtension:
         )
     
     def compterObjets(self, pointWgs84):
-        self.dlg.labelNombreObjets.setText("Nombre d'objets :")
+        self.dlg.labelNombreObjets.setText("-")
 
         try:
             distance = int(self.dlg.lineEditDistance.text())
@@ -251,6 +250,7 @@ class MonExtension:
         versLambert93 = QgsCoordinateTransform(crsWgs84, crsLambert93, projet)
         pointLambert93 = versLambert93.transform(pointWgs84)
         zoneTampon = QgsGeometry.fromPointXY(pointLambert93).buffer(distance, 25)
+        self.afficherZoneTampon(zoneTampon)
 
         # Passage de la zone tampon dans le système de la couche
         versCouche = QgsCoordinateTransform(crsLambert93, couche.crs(), projet)
@@ -263,11 +263,7 @@ class MonExtension:
             if objet.geometry().intersects(zoneTampon):
                 nombre += 1
 
-        self.dlg.labelNombreObjets.setText(
-            f"Il y a {nombre} objet(s) à moins de {distance} mètres du point cliqué"
-        )
-        zoneTampon = QgsGeometry.fromPointXY(pointLambert93).buffer(distance, 25)
-        self.afficherZoneTampon(zoneTampon)
+        self.dlg.labelNombreObjets.setText(str(nombre))
 
     def afficherZoneTampon(self, zoneTampon):
         projet = QgsProject.instance()
